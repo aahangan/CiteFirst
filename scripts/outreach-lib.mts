@@ -1,6 +1,7 @@
 // Shared pieces for outreach: matching a prospect firm to real, recent OSHA cases near it, and the
 // pitch built from them. Used by scripts/outreach-drafts.mts.
 import type { Lead } from "../src/engine/schema";
+import { STATES } from "../src/lib/geo";
 
 export const SENDER = { name: "Aahan Gandhi", site: "getcitefirst.com" };
 
@@ -43,8 +44,10 @@ export const STATE_REGIONS: Record<string, { name: string; regions: Record<strin
 export const regionOf = (city: string, state = "TX") =>
   Object.entries(STATE_REGIONS[state]?.regions ?? {}).find(([, r]) => r.cities.some((c) => c.toLowerCase() === city.toLowerCase()))?.[0];
 
+export const stateName = (state: string) => STATE_REGIONS[state]?.name ?? STATES[state] ?? state;
+
 export const areaName = (region: string | undefined, state = "TX") =>
-  (region && STATE_REGIONS[state]?.regions[region]?.label) || STATE_REGIONS[state]?.name || state;
+  (region && STATE_REGIONS[state]?.regions[region]?.label) || stateName(state);
 
 /** Specialty words → NAICS sector labels from the lead data. */
 const SPECIALTY_INDUSTRIES: [RegExp, string[]][] = [
@@ -96,8 +99,11 @@ export function describe(l: Lead) {
 export function pickLeads(all: Lead[], firm: Record<string, string>, state: string) {
   const region = firm.region || regionOf(firm.city.split(/ \/ |[(]/)[0].trim(), state);
   const industries = SPECIALTY_INDUSTRIES.filter(([re]) => re.test(firm.specialty)).flatMap(([, s]) => s);
+  // States without a metro list fall back to matching the firm's own city.
+  const firmCity = firm.city.split(/ \/ |[(]/)[0].trim().toLowerCase();
+  const near = (l: Lead) => (region ? regionOf(l.city, state) === region : l.city.toLowerCase() === firmCity);
   const score = (l: Lead) =>
-    (regionOf(l.city, state) === region ? 100 : 0) + (industries.includes(l.industry ?? "") ? 40 : 0) + (l.kind === "citation" ? Math.min(l.penalty / 500, 60) : 0) + l.heat / 10;
+    (near(l) ? 100 : 0) + (industries.includes(l.industry ?? "") ? 40 : 0) + (l.kind === "citation" ? Math.min(l.penalty / 500, 60) : 0) + l.heat / 10;
   const ranked = [...all].sort((a, b) => score(b) - score(a));
   // Mix: prefer two citations and one open inspection, all different cities if possible.
   const picked: Lead[] = [];
@@ -105,21 +111,21 @@ export function pickLeads(all: Lead[], firm: Record<string, string>, state: stri
     const next = ranked.find((l) => l.kind === want && !picked.includes(l) && !picked.some((p) => p.city === l.city)) ?? ranked.find((l) => !picked.includes(l));
     if (next) picked.push(next);
   }
-  return { region, picked, inRegion: all.filter((l) => regionOf(l.city, state) === region).length };
+  return { region, picked, inRegion: region ? all.filter((l) => regionOf(l.city, state) === region).length : 0 };
 }
 
 /** The pitch for one firm: email subject and body, plus a shorter message for website contact forms. */
 export function pitch(firm: Record<string, string>, leads: Lead[], mailingAddress: string, state = "TX") {
   const { region, picked, inRegion } = pickLeads(leads, firm, state);
-  const stateName = STATE_REGIONS[state]?.name ?? state;
+  const fullState = stateName(state);
   const first = firm.contact_name ? firm.contact_name.split(/[ (]/)[0] : "";
   // "Berg Compliance Solutions (BES)" → "Berg Compliance Solutions"
   const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim();
   // Quiet regions get the statewide number, so the pitch doesn't undersell.
   const local = inRegion >= 10;
   const count = local ? inRegion : leads.length;
-  const where = local ? areaName(region, state) : stateName;
-  const subject = `${count} ${local ? "" : `${stateName} `}employers OSHA cited or inspected ${local ? `in ${where} ` : ""}this month`;
+  const where = local ? areaName(region, state) : fullState;
+  const subject = `${count} ${local ? "" : `${fullState} `}employers OSHA cited or inspected ${local ? `in ${where} ` : ""}this month`;
   const cases = picked.map((l) => `- ${describe(l)}`);
   const offer = `Would a free 30-day trial be useful for ${name}? Reply "yes" and I'll set it up for your area. No card needed. You can see this week's cases at https://${SENDER.site}/demo.`;
   const body = [

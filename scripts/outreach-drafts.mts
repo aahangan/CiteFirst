@@ -10,13 +10,13 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { getLeads } from "../src/lib/cases";
 import { safety } from "../src/verticals/safety";
-import { csvCell, describe, parseCsv, pitch, STATE_REGIONS } from "./outreach-lib.mjs";
+import { csvCell, describe, parseCsv, pitch, STATE_REGIONS, stateName as nameOf } from "./outreach-lib.mjs";
 
 // CAN-SPAM requires a physical postal address in commercial email.
 const MAILING_ADDRESS = process.env.OUTREACH_MAILING_ADDRESS ?? "[YOUR MAILING ADDRESS]";
 
 const [, , input = "outreach/texas-prospects.csv", state = "TX"] = process.argv;
-const stateName = STATE_REGIONS[state]?.name ?? state;
+const stateName = nameOf(state);
 const firms = parseCsv(readFileSync(input, "utf8"));
 const logFile = join(dirname(input), "sent-log.csv");
 const log = existsSync(logFile) ? parseCsv(readFileSync(logFile, "utf8")) : [];
