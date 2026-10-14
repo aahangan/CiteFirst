@@ -62,11 +62,11 @@ const sheet = [
       `- **Phone:** ${firm.phone}${firm.contact_name ? ` (ask for ${firm.contact_name.replace(/\s*\(.*\)/, "")})` : ""}`,
       `- **Website:** ${firm.website || "none found"}`,
       `- **Focus:** ${firm.specialty}`,
-      firm.notes ? `- **Notes:** ${firm.notes}` : "",
+      firm.notes ? `- **Notes:** ${firm.notes}` : null,
       `- **Mention:** ${p.count} employers in ${p.where} in the last 30 days, e.g.`,
       ...p.picked.map((l) => `  - ${describe(l)}`),
       "",
-    ].filter((line) => line !== "");
+    ].filter((line) => line !== null);
   }),
   "",
   `_Regions: ${["DFW", "Gulf Coast", "South", "Central", "Permian"].map(areaName).join(", ")}._`,
