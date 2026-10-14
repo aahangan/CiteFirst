@@ -4,25 +4,27 @@
 //   <list>-calls.md    call sheet for firms with a phone number (including ones whose email bounced)
 // Nothing is sent from here.
 //
-//   OUTREACH_MAILING_ADDRESS="..." npx tsx --env-file-if-exists=.env.local scripts/outreach-drafts.mts outreach/texas-prospects.csv
+//   OUTREACH_MAILING_ADDRESS="..." npx tsx --env-file-if-exists=.env.local scripts/outreach-drafts.mts outreach/texas-prospects.csv [TX]
+// The state (TX, FL, CA, ...) decides which cases are cited; it defaults to TX.
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { getLeads } from "../src/lib/cases";
 import { safety } from "../src/verticals/safety";
-import { areaName, csvCell, describe, parseCsv, pitch } from "./outreach-lib.mjs";
+import { csvCell, describe, parseCsv, pitch, STATE_REGIONS } from "./outreach-lib.mjs";
 
 // CAN-SPAM requires a physical postal address in commercial email.
 const MAILING_ADDRESS = process.env.OUTREACH_MAILING_ADDRESS ?? "[YOUR MAILING ADDRESS]";
 
-const [, , input = "outreach/texas-prospects.csv"] = process.argv;
+const [, , input = "outreach/texas-prospects.csv", state = "TX"] = process.argv;
+const stateName = STATE_REGIONS[state]?.name ?? state;
 const firms = parseCsv(readFileSync(input, "utf8"));
 const logFile = join(dirname(input), "sent-log.csv");
 const log = existsSync(logFile) ? parseCsv(readFileSync(logFile, "utf8")) : [];
 const emailed = new Set(log.map((r) => r.email.toLowerCase()));
 const delivered = new Set(log.filter((r) => r.status === "sent").map((r) => r.company));
 
-const leads = await getLeads(safety, { areas: ["TX"], days: 30 });
-if (!leads.length) throw new Error("No Texas leads in the snapshot. Run `npm run ingest` first.");
+const leads = await getLeads(safety, { areas: [state], days: 30 });
+if (!leads.length) throw new Error(`No ${stateName} leads in the snapshot. Run \`npm run ingest\` first.`);
 const write = (suffix: string, text: string) => {
   const file = input.replace(/\.csv$/, suffix);
   writeFileSync(file, text);
@@ -32,31 +34,31 @@ const write = (suffix: string, text: string) => {
 // Emails: anyone with an address we haven't used yet.
 const emails = [["email", "firm", "first_name", "subject", "body"]];
 for (const firm of firms.filter((f) => f.email && !emailed.has(f.email.toLowerCase()))) {
-  const p = pitch(firm, leads, MAILING_ADDRESS);
+  const p = pitch(firm, leads, MAILING_ADDRESS, state);
   emails.push([firm.email, firm.firm, p.first, p.subject, p.body]);
 }
 
 // Contact forms: no email, but a website, and not already reached by email.
 const forms = [["firm", "website", "subject", "message"]];
 for (const firm of firms.filter((f) => !f.email && f.website && !delivered.has(f.firm))) {
-  const p = pitch(firm, leads, MAILING_ADDRESS);
+  const p = pitch(firm, leads, MAILING_ADDRESS, state);
   forms.push([firm.firm, firm.website, `Leads for ${p.name}: employers OSHA just cited near you`, p.formMessage]);
 }
 
 // Calls: anyone with a phone who hasn't received an email.
 const calls = firms.filter((f) => f.phone && !delivered.has(f.firm));
 const sheet = [
-  "# Call sheet: Texas safety firms",
+  `# Call sheet: ${stateName} safety firms`,
   "",
-  `Generated ${new Date().toISOString().slice(0, 10)} from the live OSHA snapshot (${leads.length} Texas leads, last 30 days).`,
+  `Generated ${new Date().toISOString().slice(0, 10)} from the live OSHA snapshot (${leads.length} ${stateName} leads, last 30 days).`,
   "",
-  "**Opener (30 seconds):** \"Hi, this is Aahan. I'm a UCLA student who built a tool for safety consultants: every morning it emails you the employers OSHA just inspected or cited in your area, with the exact standards they were cited for. I'm offering a free 30-day trial to a few Texas firms. Who handles new business there?\"",
+  `**Opener (30 seconds):** "Hi, this is Aahan. I'm a UCLA student who built a tool for safety consultants: every morning it emails you the employers OSHA just inspected or cited in your area, with the exact standards they were cited for. I'm offering a free 30-day trial to a few ${stateName} firms. Who handles new business there?"`,
   "",
   "**If they're interested:** get the best email and the counties or cities they cover; I'll set up the trial from /admin.",
   "**Common pushback:** \"We get enough work from referrals.\" → \"Makes sense. This is for when you want more: these are employers that need help right now and often don't have a consultant yet.\"",
   "",
   ...calls.flatMap((firm) => {
-    const p = pitch(firm, leads, MAILING_ADDRESS);
+    const p = pitch(firm, leads, MAILING_ADDRESS, state);
     return [
       `## ${firm.firm} · ${firm.city}`,
       `- **Phone:** ${firm.phone}${firm.contact_name ? ` (ask for ${firm.contact_name.replace(/\s*\(.*\)/, "")})` : ""}`,
@@ -69,7 +71,7 @@ const sheet = [
     ].filter((line) => line !== null);
   }),
   "",
-  `_Regions: ${["DFW", "Gulf Coast", "South", "Central", "Permian"].map(areaName).join(", ")}._`,
+  `_Regions: ${Object.values(STATE_REGIONS[state]?.regions ?? {}).map((r) => r.label).join(", ")}._`,
 ].join("\n");
 
 const toCsv = (rows: string[][]) => rows.map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
