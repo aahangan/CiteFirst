@@ -1,0 +1,52 @@
+import type { Metadata } from "next";
+import { DashboardShell } from "@/components/DashboardShell";
+import { BillingButton, SettingsForm, AreaLocks, type AreaRow } from "@/components/Settings";
+import { accountVertical, isTrial, lockOwner, requireAccount } from "@/lib/accounts";
+import { PLAN } from "@/lib/brand";
+import { getLeads } from "@/lib/cases";
+
+export const metadata: Metadata = { title: "Settings · CiteFirst" };
+
+export default async function Settings() {
+  const account = await requireAccount();
+
+  // Lead volume per state over 30 days helps them decide which states are worth locking.
+  const leads = await getLeads(accountVertical(account), { areas: account.areas, days: 30 });
+  const volume = new Map<string, number>();
+  for (const l of leads) volume.set(l.state, (volume.get(l.state) ?? 0) + 1);
+  const candidates = account.areas.length
+    ? account.areas
+    : [...new Set([...account.lockedAreas, ...[...volume].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([z]) => z)])];
+  const owners = await Promise.all(candidates.map((z) => lockOwner(account, z)));
+  const rows: AreaRow[] = candidates.map((area, i) => ({
+    area,
+    leads30: volume.get(area) ?? 0,
+    state: owners[i] === account.id ? "mine" : owners[i] ? "taken" : "open",
+  }));
+
+  return (
+    <DashboardShell account={account} active="settings">
+      <h1 className="mb-6 font-[family-name:var(--font-display)] text-3xl font-extrabold">Settings</h1>
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+        <section className="rounded-2xl border border-line bg-card p-6">
+          <h2 className="mb-4 font-semibold">Company & service area</h2>
+          <SettingsForm company={account.company} areas={account.areas.join(", ")} digest={account.digest} email={account.email} />
+        </section>
+        <section className="rounded-2xl border border-line bg-card p-6">
+          <h2 className="font-semibold">Exclusive states</h2>
+          <p className="mb-4 text-sm text-muted">{PLAN.areaLock}/month per state. While you hold a state, no other customer buying the same leads sees its cases.</p>
+          <AreaLocks rows={rows} trialing={isTrial(account)} />
+        </section>
+      </div>
+      {account.stripeCustomer && (
+        <section className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-6">
+          <div>
+            <h2 className="font-semibold">Billing</h2>
+            <p className="text-sm text-muted">Update your card, download invoices or cancel.</p>
+          </div>
+          <BillingButton />
+        </section>
+      )}
+    </DashboardShell>
+  );
+}
