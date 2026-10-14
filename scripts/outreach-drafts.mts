@@ -55,14 +55,15 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 /** One case as a line a safety consultant would care about. Employer names are left out on purpose. */
 function describe(l: Lead) {
   const what = l.industry ? l.industry.toLowerCase().replace("mining & oil/gas", "oil & gas") : "local";
-  const article = /^[aeiou]/.test(what) ? "An" : "A";
+  // "an oil & gas company" but "a utilities company" (the "you" sound).
+  const article = /^[aeio]|^u(?!ti|ni|se|su)/.test(what) ? "An" : "A";
   const size = l.employees && l.employees >= 20 ? `, ~${l.employees.toLocaleString("en-US")} employees` : "";
   if (l.kind === "inspection") return `${article} ${what} company in ${l.city}${size}: OSHA opened a ${l.inspectionType.toLowerCase()} inspection, no citations yet.`;
   const items = l.notes.filter((n) => !n.startsWith("+")).map((n) => n.split(" · ")[1]?.toLowerCase()).filter((x): x is string => !!x && !/^(serious|willful|repeat|other)/.test(x));
   // "fall protection" already covers "fall protection training".
   const topics = items.filter((t, i) => !items.slice(0, i).some((p) => t.startsWith(p) || p.startsWith(t))).slice(0, 2).join(" and ");
-  // OSHA publishes citations weeks after issuing them, so describe them as just published, not by issue date.
-  return `${article} ${what} company in ${l.city}${size}: citations just published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
+  // OSHA publishes citations weeks after issuing them, so describe them as recently published, not by issue date.
+  return `${article} ${what} company in ${l.city}${size}: citations recently published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
 }
 
 function pickLeads(all: Lead[], firm: Record<string, string>) {
