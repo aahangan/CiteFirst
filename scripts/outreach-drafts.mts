@@ -1,125 +1,78 @@
-// Builds personalized cold emails for prospects: each firm gets 3 real, recent OSHA cases from its
-// own region, pulled from the stored snapshot. Output is a mail-merge CSV (one row per firm with an
-// email) for sending from Gmail with a merge add-on. Nothing is sent from here.
+// Builds outreach for a prospect list, each piece citing 3 real, recent OSHA cases near the firm:
+//   <list>-emails.csv  firms with an email not yet emailed (per outreach/sent-log.csv)
+//   <list>-forms.csv   firms with only a website contact form: a shorter message to paste in
+//   <list>-calls.md    call sheet for firms with a phone number (including ones whose email bounced)
+// Nothing is sent from here.
 //
-//   npx tsx --env-file-if-exists=.env.local scripts/outreach-drafts.mts outreach/texas-prospects.csv
-import { readFileSync, writeFileSync } from "fs";
+//   OUTREACH_MAILING_ADDRESS="..." npx tsx --env-file-if-exists=.env.local scripts/outreach-drafts.mts outreach/texas-prospects.csv
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
 import { getLeads } from "../src/lib/cases";
 import { safety } from "../src/verticals/safety";
-import type { Lead } from "../src/engine/schema";
+import { areaName, csvCell, describe, parseCsv, pitch } from "./outreach-lib.mjs";
 
-const SENDER = { name: "Aahan Gandhi", site: "getcitefirst.com" };
 // CAN-SPAM requires a physical postal address in commercial email.
 const MAILING_ADDRESS = process.env.OUTREACH_MAILING_ADDRESS ?? "[YOUR MAILING ADDRESS]";
 
-/** Rough metro buckets for matching a firm to nearby cases. */
-const REGIONS: Record<string, string[]> = {
-  "Gulf Coast": ["Houston", "Pasadena", "Baytown", "Deer Park", "La Porte", "Katy", "Sugar Land", "The Woodlands", "Conroe", "Spring", "Humble", "Pearland", "League City", "Galveston", "Texas City", "Beaumont", "Port Arthur", "Orange", "Freeport", "Corpus Christi", "Victoria", "Channelview", "Tomball", "Cypress", "Missouri City", "Rosenberg"],
-  DFW: ["Dallas", "Fort Worth", "Arlington", "Irving", "Plano", "Frisco", "McKinney", "Garland", "Grand Prairie", "Mesquite", "Denton", "Carrollton", "Richardson", "Lewisville", "Allen", "Grapevine", "Coppell", "Mansfield", "Euless", "Haltom City", "Wylie", "Rockwall", "Sherman", "Waxahachie", "Midlothian", "Weatherford", "Cleburne", "Farmers Branch", "Addison", "Lancaster", "Desoto", "Cedar Hill", "Keller", "Southlake"],
-  South: ["San Antonio", "New Braunfels", "Seguin", "Schertz", "Cibolo", "Boerne", "Laredo", "McAllen", "Edinburg", "Brownsville", "Harlingen", "Pharr", "Mission", "Converse", "Universal City"],
-  Central: ["Austin", "Round Rock", "Georgetown", "Pflugerville", "Cedar Park", "Leander", "San Marcos", "Kyle", "Buda", "Taylor", "Temple", "Killeen", "Waco", "Bryan", "College Station", "Hutto", "Manor", "Bastrop"],
-  Permian: ["Midland", "Odessa", "Big Spring", "Pecos", "Andrews", "Monahans", "Kermit", "Seminole", "Stanton", "San Angelo", "Lubbock"],
-};
-const regionOf = (city: string) => Object.entries(REGIONS).find(([, cities]) => cities.some((c) => c.toLowerCase() === city.toLowerCase()))?.[0];
-
-/** Specialty words → NAICS sector labels from the lead data. */
-const SPECIALTY_INDUSTRIES: [RegExp, string[]][] = [
-  [/construct|roof|data center|EM 385/i, ["Construction"]],
-  [/oil|gas|petro|H2S|drill|frac|refin/i, ["Mining & oil/gas", "Utilities"]],
-  [/manufactur|factory|fabricat|industrial|machine/i, ["Manufacturing"]],
-  [/warehouse|forklift|logistic/i, ["Warehousing & delivery", "Transportation", "Wholesale"]],
-];
-
-function parseCsv(text: string): Record<string, string>[] {
-  const rows: string[][] = [];
-  let row: string[] = [], cell = "", quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (quoted) {
-      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-      else if (ch === '"') quoted = false;
-      else cell += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === ",") { row.push(cell); cell = ""; }
-    else if (ch === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
-    else if (ch !== "\r") cell += ch;
-  }
-  if (cell || row.length) { row.push(cell); rows.push(row); }
-  const [head, ...body] = rows;
-  return body.filter((r) => r.some(Boolean)).map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
-}
-
-const csvCell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-
-/** One case as a line a safety consultant would care about. Employer names are left out on purpose. */
-function describe(l: Lead) {
-  const what = l.industry ? l.industry.toLowerCase().replace("mining & oil/gas", "oil & gas") : "local";
-  // "an oil & gas company" but "a utilities company" (the "you" sound).
-  const article = /^[aeio]|^u(?!ti|ni|se|su)/.test(what) ? "An" : "A";
-  const size = l.employees && l.employees >= 20 ? `, ~${l.employees.toLocaleString("en-US")} employees` : "";
-  if (l.kind === "inspection") return `${article} ${what} company in ${l.city}${size}: OSHA opened a ${l.inspectionType.toLowerCase()} inspection, no citations yet.`;
-  const items = l.notes.filter((n) => !n.startsWith("+")).map((n) => n.split(" · ")[1]?.toLowerCase()).filter((x): x is string => !!x && !/^(serious|willful|repeat|other)/.test(x));
-  // "fall protection" already covers "fall protection training".
-  const topics = items.filter((t, i) => !items.slice(0, i).some((p) => t.startsWith(p) || p.startsWith(t))).slice(0, 2).join(" and ");
-  // OSHA publishes citations weeks after issuing them, so describe them as recently published, not by issue date.
-  return `${article} ${what} company in ${l.city}${size}: citations recently published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
-}
-
-function pickLeads(all: Lead[], firm: Record<string, string>) {
-  const region = firm.region || regionOf(firm.city.split(/[ /(]/)[0]);
-  const industries = SPECIALTY_INDUSTRIES.filter(([re]) => re.test(firm.specialty)).flatMap(([, s]) => s);
-  const score = (l: Lead) =>
-    (regionOf(l.city) === region ? 100 : 0) + (industries.includes(l.industry ?? "") ? 40 : 0) + (l.kind === "citation" && l.penalty >= 5000 ? 20 : 0) + l.heat / 10;
-  const ranked = [...all].sort((a, b) => score(b) - score(a));
-  // Mix: prefer two citations and one open inspection, all different cities if possible.
-  const picked: Lead[] = [];
-  for (const want of ["citation", "citation", "inspection"] as const) {
-    const next = ranked.find((l) => l.kind === want && !picked.includes(l) && !picked.some((p) => p.city === l.city)) ?? ranked.find((l) => !picked.includes(l));
-    if (next) picked.push(next);
-  }
-  return { region, picked, inRegion: all.filter((l) => regionOf(l.city) === region).length };
-}
-
 const [, , input = "outreach/texas-prospects.csv"] = process.argv;
 const firms = parseCsv(readFileSync(input, "utf8"));
+const logFile = join(dirname(input), "sent-log.csv");
+const log = existsSync(logFile) ? parseCsv(readFileSync(logFile, "utf8")) : [];
+const emailed = new Set(log.map((r) => r.email.toLowerCase()));
+const delivered = new Set(log.filter((r) => r.status === "sent").map((r) => r.company));
+
 const leads = await getLeads(safety, { areas: ["TX"], days: 30 });
 if (!leads.length) throw new Error("No Texas leads in the snapshot. Run `npm run ingest` first.");
+const write = (suffix: string, text: string) => {
+  const file = input.replace(/\.csv$/, suffix);
+  writeFileSync(file, text);
+  return file;
+};
 
-const out: string[][] = [["email", "firm", "first_name", "subject", "body"]];
-for (const firm of firms.filter((f) => f.email)) {
-  const { region, picked, inRegion } = pickLeads(leads, firm);
-  const first = firm.contact_name ? firm.contact_name.split(/[ (]/)[0] : "";
-  // "Berg Compliance Solutions (BES)" → "Berg Compliance Solutions"
-  const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim();
-  const area = region === "DFW" ? "Dallas–Fort Worth" : region === "Gulf Coast" ? "the Houston area" : region === "South" ? "the San Antonio area" : region === "Central" ? "Central Texas" : region === "Permian" ? "the Permian Basin" : "Texas";
-  // Quiet regions get the statewide number, so the pitch doesn't undersell.
-  const local = inRegion >= 10;
-  const count = local ? inRegion : leads.length;
-  const subject = `${count} ${local ? "" : "Texas "}employers OSHA cited or inspected ${local ? `in ${area} ` : ""}this month`;
-  const body = [
-    first ? `Hi ${first},` : `Hi ${name} team,`,
-    "",
-    "I'm Aahan, a UCLA student building CiteFirst on my own: a lead service for safety consultants and trainers.",
-    "",
-    `Every morning it sends you the employers OSHA just inspected or cited in your area. In the last 30 days OSHA published ${count} of them in ${local ? area : "Texas"}. A few recent ones:`,
-    "",
-    ...picked.map((l) => `- ${describe(l)}`),
-    "",
-    "Each lead names the employer and lists the exact standards cited and the penalties, so you know what training and programs they need before you call. It all comes from OSHA's public enforcement records, so you can look up any of them yourself: https://www.osha.gov/ords/imis/establishment.html",
-    "",
-    `Would a free 30-day trial be useful for ${name}? Reply "yes" and I'll set it up for your area. No card needed. You can see this week's cases at https://${SENDER.site}/demo.`,
-    "",
-    "Thanks,",
-    SENDER.name,
-    `CiteFirst · ${SENDER.site}`,
-    "",
-    `${MAILING_ADDRESS}`,
-    "If you'd rather not hear from me, just reply \"no thanks\" and I won't email again.",
-  ].join("\n");
-  out.push([firm.email, firm.firm, first, subject, body]);
+// Emails: anyone with an address we haven't used yet.
+const emails = [["email", "firm", "first_name", "subject", "body"]];
+for (const firm of firms.filter((f) => f.email && !emailed.has(f.email.toLowerCase()))) {
+  const p = pitch(firm, leads, MAILING_ADDRESS);
+  emails.push([firm.email, firm.firm, p.first, p.subject, p.body]);
 }
 
-const file = input.replace(/\.csv$/, "-emails.csv");
-writeFileSync(file, out.map((r) => r.map(csvCell).join(",")).join("\n") + "\n");
-console.log(`Wrote ${out.length - 1} emails to ${file} from ${leads.length} Texas leads.`);
+// Contact forms: no email, but a website, and not already reached by email.
+const forms = [["firm", "website", "subject", "message"]];
+for (const firm of firms.filter((f) => !f.email && f.website && !delivered.has(f.firm))) {
+  const p = pitch(firm, leads, MAILING_ADDRESS);
+  forms.push([firm.firm, firm.website, `Leads for ${p.name}: employers OSHA just cited near you`, p.formMessage]);
+}
+
+// Calls: anyone with a phone who hasn't received an email.
+const calls = firms.filter((f) => f.phone && !delivered.has(f.firm));
+const sheet = [
+  "# Call sheet: Texas safety firms",
+  "",
+  `Generated ${new Date().toISOString().slice(0, 10)} from the live OSHA snapshot (${leads.length} Texas leads, last 30 days).`,
+  "",
+  "**Opener (30 seconds):** \"Hi, this is Aahan. I'm a UCLA student who built a tool for safety consultants: every morning it emails you the employers OSHA just inspected or cited in your area, with the exact standards they were cited for. I'm offering a free 30-day trial to a few Texas firms. Who handles new business there?\"",
+  "",
+  "**If they're interested:** get the best email and the counties or cities they cover; I'll set up the trial from /admin.",
+  "**Common pushback:** \"We get enough work from referrals.\" → \"Makes sense. This is for when you want more: these are employers that need help right now and often don't have a consultant yet.\"",
+  "",
+  ...calls.flatMap((firm) => {
+    const p = pitch(firm, leads, MAILING_ADDRESS);
+    return [
+      `## ${firm.firm} · ${firm.city}`,
+      `- **Phone:** ${firm.phone}${firm.contact_name ? ` (ask for ${firm.contact_name.replace(/\s*\(.*\)/, "")})` : ""}`,
+      `- **Website:** ${firm.website || "none found"}`,
+      `- **Focus:** ${firm.specialty}`,
+      firm.notes ? `- **Notes:** ${firm.notes}` : "",
+      `- **Mention:** ${p.count} employers in ${p.where} in the last 30 days, e.g.`,
+      ...p.picked.map((l) => `  - ${describe(l)}`),
+      "",
+    ].filter((line) => line !== "");
+  }),
+  "",
+  `_Regions: ${["DFW", "Gulf Coast", "South", "Central", "Permian"].map(areaName).join(", ")}._`,
+].join("\n");
+
+const toCsv = (rows: string[][]) => rows.map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
+console.log(`Emails: ${emails.length - 1} → ${write("-emails.csv", toCsv(emails))}`);
+console.log(`Contact forms: ${forms.length - 1} → ${write("-forms.csv", toCsv(forms))}`);
+console.log(`Calls: ${calls.length} → ${write("-calls.md", sheet + "\n")}`);
