@@ -89,21 +89,25 @@ const out: string[][] = [["email", "firm", "first_name", "subject", "body"]];
 for (const firm of firms.filter((f) => f.email)) {
   const { region, picked, inRegion } = pickLeads(leads, firm);
   const first = firm.contact_name ? firm.contact_name.split(/[ (]/)[0] : "";
+  // "Berg Compliance Solutions (BES)" → "Berg Compliance Solutions"
+  const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim();
   const area = region === "DFW" ? "Dallas–Fort Worth" : region === "Gulf Coast" ? "the Houston area" : region === "South" ? "the San Antonio area" : region === "Central" ? "Central Texas" : region === "Permian" ? "the Permian Basin" : "Texas";
   // Quiet regions get the statewide number, so the pitch doesn't undersell.
   const local = inRegion >= 10;
   const count = local ? inRegion : leads.length;
   const subject = `${count} ${local ? "" : "Texas "}employers OSHA cited or inspected ${local ? `in ${area} ` : ""}this month`;
   const body = [
-    first ? `Hi ${first},` : `Hi ${firm.firm} team,`,
+    first ? `Hi ${first},` : `Hi ${name} team,`,
     "",
-    `I run CiteFirst, which sends safety consultants the employers OSHA just inspected or cited in their area, every morning. In the last 30 days that was ${count} employers in ${local ? area : "Texas"}. A few recent ones:`,
+    "I'm Aahan, a UCLA student building CiteFirst on my own: a lead service for safety consultants and trainers.",
+    "",
+    `Every morning it sends you the employers OSHA just inspected or cited in your area. In the last 30 days OSHA published ${count} of them in ${local ? area : "Texas"}. A few recent ones:`,
     "",
     ...picked.map((l) => `- ${describe(l)}`),
     "",
-    "Each one comes with the cited standards, penalties and fix-by dates, so you know exactly what training and programs they need before you call.",
+    "Each lead names the employer and lists the exact standards cited and the penalties, so you know what training and programs they need before you call. It all comes from OSHA's public enforcement records, so you can look up any of them yourself: https://www.osha.gov/ords/imis/establishment.html",
     "",
-    `Would a free 30-day trial be useful for ${firm.firm}? Reply "yes" and I'll set it up for your area. No card needed. You can see this week's cases at https://${SENDER.site}/demo.`,
+    `Would a free 30-day trial be useful for ${name}? Reply "yes" and I'll set it up for your area. No card needed. You can see this week's cases at https://${SENDER.site}/demo.`,
     "",
     "Thanks,",
     SENDER.name,
