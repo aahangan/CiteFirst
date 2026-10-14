@@ -89,7 +89,35 @@ export function formatStandard(raw: string) {
   return section + paras.map((p) => `(${/^\d+$/.test(p) ? Number(p) : p.toLowerCase()})`).join("");
 }
 
+/** California (Cal/OSHA, Title 8 CCR) sections, which state-plan records cite by bare section number. */
+const CAL_STANDARDS: Record<string, string> = {
+  "342": "Serious injury reporting",
+  "461": "Air tank permits",
+  "1509": "Construction injury prevention program",
+  "1512": "Construction first aid",
+  "1670": "Fall protection",
+  "3203": "Injury and illness prevention program (IIPP)",
+  "3210": "Guardrails",
+  "3276": "Ladders",
+  "3314": "Lockout/tagout",
+  "3328": "Machine safety",
+  "3380": "Personal protective equipment",
+  "3395": "Heat illness prevention",
+  "3396": "Indoor heat illness prevention",
+  "3457": "Field sanitation",
+  "3650": "Industrial trucks (forklifts)",
+  "3653": "Forklift operation",
+  "3664": "Forklift operator training",
+  "5144": "Respiratory protection",
+  "5162": "Emergency eyewash and showers",
+  "5194": "Hazard communication",
+  "5204": "Respirable crystalline silica",
+  "6151": "Fire extinguishers",
+};
+
 export function standardName(standard: string) {
   const s = formatStandard(standard);
+  const cal = CAL_STANDARDS[s.split("(")[0]];
+  if (cal) return cal;
   return STANDARDS.find(([prefix]) => s === prefix || s.startsWith(`${prefix}(`) || s.startsWith(`${prefix}.`) || (prefix.length <= 6 && s.startsWith(prefix)))?.[1];
 }

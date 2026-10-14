@@ -67,6 +67,8 @@ describe("standards", () => {
     expect(standardName("1910.1200(e)(1)")).toBe("Hazard communication");
     expect(standardName("1904.39(a)")).toBe("Injury and illness recordkeeping");
     expect(standardName("1915.77")).toBeUndefined();
+    expect(standardName("3203(a)(4)")).toBe("Injury and illness prevention program (IIPP)");
+    expect(standardName("3395")).toBe("Heat illness prevention");
   });
 });
 

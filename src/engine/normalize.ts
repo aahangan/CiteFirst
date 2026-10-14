@@ -1,5 +1,5 @@
 // Pure functions that turn OSHA cases into a vertical's scored leads. No I/O, so they're unit tested.
-import { INSPECTION_TYPES, VIOLATION_TYPES } from "./osha";
+import { INSPECTION_TYPES, standardName, VIOLATION_TYPES } from "./osha";
 import type { Lead, OshaCase, Vertical } from "./schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -22,7 +22,8 @@ function notesFor(c: OshaCase) {
     return [`${INSPECTION_TYPES[c.inspectionType] ?? "Other"} inspection opened ${c.openDate}${c.scope ? ` · ${c.scope.toLowerCase()} scope` : ""}. No citations issued yet.`];
   }
   const shown = c.items.slice(0, 8).map((i) =>
-    [i.standard || "Unlisted standard", i.standardName, VIOLATION_TYPES[i.type] ?? i.type, i.penalty ? usd(i.penalty) : null].filter(Boolean).join(" · "),
+    // Names are looked up again here so snapshots stored before a name was added still get it.
+    [i.standard || "Unlisted standard", i.standardName ?? standardName(i.standard), VIOLATION_TYPES[i.type] ?? i.type, i.penalty ? usd(i.penalty) : null].filter(Boolean).join(" · "),
   );
   return c.items.length > shown.length ? [...shown, `+ ${c.items.length - shown.length} more items`] : shown;
 }

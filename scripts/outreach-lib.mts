@@ -78,14 +78,17 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 /** One case as a line a safety consultant would care about. Employer names are left out on purpose. */
 export function describe(l: Lead) {
-  const what = l.industry ? l.industry.toLowerCase().replace("mining & oil/gas", "oil & gas") : "local";
+  const NOUNS: Record<string, string> = { "mining & oil/gas": "oil & gas", "hotels & restaurants": "hospitality", "arts & recreation": "recreation", "warehousing & delivery": "warehousing", "admin & waste services": "services" };
+  const sector = l.industry?.toLowerCase();
+  const what = sector ? NOUNS[sector] ?? sector : "local";
   // "an oil & gas company" but "a utilities company" (the "you" sound).
   const article = /^[aeio]|^u(?!ti|ni|se|su)/.test(what) ? "An" : "A";
   const size = l.employees && l.employees >= 20 ? `, ~${l.employees.toLocaleString("en-US")} employees` : "";
-  if (l.kind === "inspection") return `${article} ${what} company in ${l.city}${size}: OSHA opened a ${l.inspectionType.toLowerCase()} inspection, no citations yet.`;
+  const type = l.inspectionType.toLowerCase();
+  if (l.kind === "inspection") return `${article} ${what} company in ${l.city}${size}: OSHA opened ${/^[aeio]/.test(type) ? "an" : "a"} ${type} inspection, no citations yet.`;
   const items = l.notes.filter((n) => !n.startsWith("+")).map((n) => n.split(" · ")[1]?.toLowerCase()).filter((x): x is string => !!x && !/^(serious|willful|repeat|other)/.test(x));
   // "fall protection" already covers "fall protection training".
-  const topics = items.filter((t, i) => !items.slice(0, i).some((p) => t.startsWith(p) || p.startsWith(t))).slice(0, 2).join(" and ");
+  const topics = items.filter((t, i) => !items.slice(0, i).some((p) => t.startsWith(p) || p.startsWith(t))).slice(0, 2).join(" and ").replace("(iipp)", "(IIPP)");
   // OSHA publishes citations weeks after issuing them, so describe them as recently published, not by issue date.
   return `${article} ${what} company in ${l.city}${size}: citations recently published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
 }
@@ -94,7 +97,7 @@ export function pickLeads(all: Lead[], firm: Record<string, string>, state: stri
   const region = firm.region || regionOf(firm.city.split(/ \/ |[(]/)[0].trim(), state);
   const industries = SPECIALTY_INDUSTRIES.filter(([re]) => re.test(firm.specialty)).flatMap(([, s]) => s);
   const score = (l: Lead) =>
-    (regionOf(l.city, state) === region ? 100 : 0) + (industries.includes(l.industry ?? "") ? 40 : 0) + (l.kind === "citation" && l.penalty >= 5000 ? 20 : 0) + l.heat / 10;
+    (regionOf(l.city, state) === region ? 100 : 0) + (industries.includes(l.industry ?? "") ? 40 : 0) + (l.kind === "citation" ? Math.min(l.penalty / 500, 60) : 0) + l.heat / 10;
   const ranked = [...all].sort((a, b) => score(b) - score(a));
   // Mix: prefer two citations and one open inspection, all different cities if possible.
   const picked: Lead[] = [];
