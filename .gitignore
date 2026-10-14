@@ -42,7 +42,7 @@ yarn-error.log*
 next-env.d.ts
 .data/
 .data-server.log
-outreach/
+/outreach/
 
 # local Claude Code settings
 .claude/
