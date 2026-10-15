@@ -81,7 +81,7 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 /** One case as a line a safety consultant would care about. Employer names are left out on purpose. */
 export function describe(l: Lead) {
-  const NOUNS: Record<string, string> = { "mining & oil/gas": "oil & gas", "hotels & restaurants": "hospitality", "arts & recreation": "recreation", "warehousing & delivery": "warehousing", "admin & waste services": "services" };
+  const NOUNS: Record<string, string> = { "mining & oil/gas": "oil & gas", "hotels & restaurants": "hospitality", "arts & recreation": "recreation", "warehousing & delivery": "warehousing", "admin & waste services": "services", "other services": "services" };
   const sector = l.industry?.toLowerCase();
   const what = sector ? NOUNS[sector] ?? sector : "local";
   // "an oil & gas company" but "a utilities company" (the "you" sound).
@@ -119,8 +119,8 @@ export function pitch(firm: Record<string, string>, leads: Lead[], mailingAddres
   const { region, picked, inRegion } = pickLeads(leads, firm, state);
   const fullState = stateName(state);
   const first = firm.contact_name ? firm.contact_name.split(/[ (]/)[0] : "";
-  // "Berg Compliance Solutions (BES)" → "Berg Compliance Solutions"
-  const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim();
+  // "Berg Compliance Solutions (BES)" → "Berg Compliance Solutions"; "Atlas Safety & Health LLC" → "Atlas Safety & Health"
+  const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim().replace(/,?\s+(LLC|Inc\.?|Corp\.?)$/i, "");
   // Quiet regions get the statewide number, so the pitch doesn't undersell.
   const local = inRegion >= 10;
   const count = local ? inRegion : leads.length;
