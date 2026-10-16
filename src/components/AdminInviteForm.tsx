@@ -7,7 +7,7 @@ type Result = { sent: boolean; subject: string; html: string };
 
 export function AdminInviteForm() {
   const router = useRouter();
-  const [form, setForm] = useState({ email: "", name: "", company: "", vertical: "defense", areas: "", days: 14 });
+  const [form, setForm] = useState({ email: "", name: "", company: "", vertical: "safety", areas: "", days: 30 });
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,8 +37,8 @@ export function AdminInviteForm() {
       <div className="grid grid-cols-[1fr_auto] gap-3">
         <input className="field" type="email" placeholder="Email" value={form.email} onChange={set("email")} />
         <select className="field w-auto" value={form.vertical} onChange={set("vertical")}>
-          <option value="defense">Defense attorney leads</option>
           <option value="safety">Safety consultant leads</option>
+          <option value="defense">Defense attorney leads</option>
         </select>
       </div>
       <div className="grid grid-cols-[1fr_auto] gap-3">
