@@ -19,6 +19,7 @@ const DIR = "outreach";
 const FILE_STATES: Record<string, string> = {
   texas: "TX", florida: "FL", california: "CA", newyork: "NY", pennsylvania: "PA", illinois: "IL", ohio: "OH",
   michigan: "MI", massachusetts: "MA", newjersey: "NJ", northcarolina: "NC", virginia: "VA",
+  georgia: "GA", colorado: "CO", wisconsin: "WI", missouri: "MO", louisiana: "LA",
 };
 
 const args = process.argv.slice(2);
