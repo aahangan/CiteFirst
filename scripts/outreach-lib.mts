@@ -86,14 +86,16 @@ export function describe(l: Lead) {
   const what = sector ? NOUNS[sector] ?? sector : "local";
   // "an oil & gas company" but "a utilities company" (the "you" sound).
   const article = /^[aeio]|^u(?!ti|ni|se|su)/.test(what) ? "An" : "A";
+  // Government employers aren't companies.
+  const who = what === "public administration" ? "public agency" : `${what} company`;
   const size = l.employees && l.employees >= 20 ? `, ~${l.employees.toLocaleString("en-US")} employees` : "";
   const type = l.inspectionType.toLowerCase();
-  if (l.kind === "inspection") return `${article} ${what} company in ${l.city}${size}: OSHA opened ${/^[aeio]/.test(type) ? "an" : "a"} ${type} inspection, no citations yet.`;
+  if (l.kind === "inspection") return `${article} ${who} in ${l.city}${size}: OSHA opened ${/^[aeio]/.test(type) ? "an" : "a"} ${type} inspection, no citations yet.`;
   const items = l.notes.filter((n) => !n.startsWith("+")).map((n) => n.split(" · ")[1]?.toLowerCase()).filter((x): x is string => !!x && !/^(serious|willful|repeat|other)/.test(x));
   // "fall protection" already covers "fall protection training".
   const topics = items.filter((t, i) => !items.slice(0, i).some((p) => t.startsWith(p) || p.startsWith(t))).slice(0, 2).join(" and ").replace("(iipp)", "(IIPP)");
   // OSHA publishes citations weeks after issuing them, so describe them as recently published, not by issue date.
-  return `${article} ${what} company in ${l.city}${size}: citations recently published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
+  return `${article} ${who} in ${l.city}${size}: citations recently published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
 }
 
 export function pickLeads(all: Lead[], firm: Record<string, string>, state: string) {
