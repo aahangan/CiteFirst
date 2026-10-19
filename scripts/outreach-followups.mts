@@ -11,7 +11,7 @@ import { join } from "path";
 import { getLeads } from "../src/lib/cases";
 import type { Lead } from "../src/engine/schema";
 import { safety } from "../src/verticals/safety";
-import { areaName, csvCell, describe, parseCsv, pickLeads, SENDER, stateName } from "./outreach-lib.mjs";
+import { areaName, csvCell, describe, parseCsv, pickLeads, regionOf, SENDER, stateName } from "./outreach-lib.mjs";
 
 const MAILING_ADDRESS = process.env.OUTREACH_MAILING_ADDRESS ?? "[YOUR MAILING ADDRESS]";
 const DIR = "outreach";
@@ -21,6 +21,7 @@ const FILE_STATES: Record<string, string> = {
   michigan: "MI", massachusetts: "MA", newjersey: "NJ", northcarolina: "NC", virginia: "VA",
   georgia: "GA", colorado: "CO", wisconsin: "WI", missouri: "MO", louisiana: "LA",
   tennessee: "TN", indiana: "IN", arizona: "AZ", minnesota: "MN", alabama: "AL",
+  oklahoma: "OK", kentucky: "KY", southcarolina: "SC", connecticut: "CT", maryland: "MD",
 };
 
 const args = process.argv.slice(2);
@@ -54,11 +55,14 @@ for (const sent of firsts) {
   // Only cases published after the first email, so the follow-up brings news.
   const fresh = leadsByState.get(state)!.filter((l) => l.published > (since ?? sent.sent_on));
   if (!fresh.length) continue;
-  const { region, picked, inRegion } = pickLeads(fresh, row, state);
+  const { region, inRegion } = pickLeads(fresh, row, state);
+  const local = inRegion >= 5;
+  // Naming the region means both examples must come from it (pickLeads alone may reach outside for city variety).
+  const { picked } = pickLeads(local ? fresh.filter((l) => regionOf(l.city, state) === region) : fresh, row, state);
   const cases = picked.filter((l) => l.kind === "citation").slice(0, 2);
   if (cases.length < 2) cases.push(...picked.filter((l) => !cases.includes(l)).slice(0, 2 - cases.length));
-  const where = inRegion >= 5 ? areaName(region, state) : stateName(state);
-  const count = inRegion >= 5 ? inRegion : fresh.length;
+  const where = local ? areaName(region, state) : stateName(state);
+  const count = local ? inRegion : fresh.length;
   const name = row.firm.replace(/\s*\(.*?\)\s*/g, " ").replace(/,?\s+(LLC|Inc\.?|L\.L\.C\.)$/i, "").trim();
   const first = row.contact_name ? row.contact_name.split(/[ (]/)[0] : "";
   const body = [
