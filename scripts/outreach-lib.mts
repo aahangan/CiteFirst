@@ -139,7 +139,7 @@ export function pitch(firm: Record<string, string>, leads: Lead[], mailingAddres
     "",
     ...cases,
     "",
-    "Each lead names the employer and lists the exact standards cited and the penalties, so you know what training and programs they need before you call. It all comes from OSHA's public enforcement records, so you can look up any of them yourself: https://www.osha.gov/ords/imis/establishment.html",
+    "The records are public, but OSHA only announces its biggest cases; the rest sit in a database you'd have to search by hand. CiteFirst checks it every day and sends just what's new in your area, with the employer's name, the exact standards cited and the penalties, so you know what training and programs they need before you call.",
     "",
     offer,
     "",
