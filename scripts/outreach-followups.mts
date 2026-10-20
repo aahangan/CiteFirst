@@ -32,7 +32,7 @@ const since = args.includes("--since") ? args[args.indexOf("--since") + 1] : und
 
 // Every firm we know, with the state its list belongs to.
 const firms = new Map<string, { row: Record<string, string>; state: string }>();
-for (const file of readdirSync(DIR).filter((f) => /^[a-z]+-prospects\.csv$/.test(f))) {
+for (const file of readdirSync(DIR).filter((f) => /^[a-z]+\d*-prospects\.csv$/.test(f))) {
   const state = FILE_STATES[file.replace("-prospects.csv", "")];
   if (!state) continue;
   for (const row of parseCsv(readFileSync(join(DIR, file), "utf8"))) if (row.email) firms.set(row.email.toLowerCase(), { row, state });
