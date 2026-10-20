@@ -22,6 +22,7 @@ const FILE_STATES: Record<string, string> = {
   georgia: "GA", colorado: "CO", wisconsin: "WI", missouri: "MO", louisiana: "LA",
   tennessee: "TN", indiana: "IN", arizona: "AZ", minnesota: "MN", alabama: "AL",
   oklahoma: "OK", kentucky: "KY", southcarolina: "SC", connecticut: "CT", maryland: "MD",
+  washington: "WA", oregon: "OR", kansas: "KS", iowa: "IA", utah: "UT",
 };
 
 const args = process.argv.slice(2);

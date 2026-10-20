@@ -106,7 +106,8 @@ export function pickLeads(all: Lead[], firm: Record<string, string>, state: stri
   const near = (l: Lead) => (region ? regionOf(l.city, state) === region : l.city.toLowerCase() === firmCity);
   const score = (l: Lead) =>
     (near(l) ? 100 : 0) + (industries.includes(l.industry ?? "") ? 40 : 0) + (l.kind === "citation" ? Math.min(l.penalty / 500, 60) : 0) + l.heat / 10;
-  const ranked = [...all].sort((a, b) => score(b) - score(a));
+  // A case without a city can't be placed for the reader ("a company in , ..."), so never cite one.
+  const ranked = all.filter((l) => l.city?.trim()).sort((a, b) => score(b) - score(a));
   // Mix: prefer two citations and one open inspection, all different cities if possible.
   const picked: Lead[] = [];
   for (const want of ["citation", "citation", "inspection"] as const) {
