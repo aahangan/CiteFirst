@@ -89,13 +89,15 @@ export function describe(l: Lead) {
   // Government employers aren't companies.
   const who = what === "public administration" ? "public agency" : `${what} company`;
   const size = l.employees && l.employees >= 20 ? `, ~${l.employees.toLocaleString("en-US")} employees` : "";
+  // OSHA's title-cased cities read "Mccarran"; restore "McCarran".
+  const city = l.city.replace(/\bMc([a-z])/g, (_, c: string) => `Mc${c.toUpperCase()}`);
   const type = l.inspectionType.toLowerCase();
-  if (l.kind === "inspection") return `${article} ${who} in ${l.city}${size}: OSHA opened ${/^[aeio]/.test(type) ? "an" : "a"} ${type} inspection, no citations yet.`;
+  if (l.kind === "inspection") return `${article} ${who} in ${city}${size}: OSHA opened ${/^[aeio]/.test(type) ? "an" : "a"} ${type} inspection, no citations yet.`;
   const items = l.notes.filter((n) => !n.startsWith("+")).map((n) => n.split(" · ")[1]?.toLowerCase()).filter((x): x is string => !!x && !/^(serious|willful|repeat|other)/.test(x));
   // "fall protection" already covers "fall protection training".
   const topics = items.filter((t, i) => !items.slice(0, i).some((p) => t.startsWith(p) || p.startsWith(t))).slice(0, 2).join(" and ").replace("(iipp)", "(IIPP)");
   // OSHA publishes citations weeks after issuing them, so describe them as recently published, not by issue date.
-  return `${article} ${who} in ${l.city}${size}: citations recently published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
+  return `${article} ${who} in ${city}${size}: citations recently published${l.penalty ? `, ${usd(l.penalty)} in penalties` : ""}${topics ? `, including ${topics}` : ""}.`;
 }
 
 export function pickLeads(all: Lead[], firm: Record<string, string>, state: string) {
@@ -121,7 +123,9 @@ export function pickLeads(all: Lead[], firm: Record<string, string>, state: stri
 export function pitch(firm: Record<string, string>, leads: Lead[], mailingAddress: string, state = "TX") {
   const { region, picked, inRegion } = pickLeads(leads, firm, state);
   const fullState = stateName(state);
-  const first = firm.contact_name ? firm.contact_name.split(/[ (]/)[0] : "";
+  // An initial ("J. Grossman") makes an odd greeting, so fall back to "Hi <firm> team".
+  const given = firm.contact_name ? firm.contact_name.split(/[ (]/)[0] : "";
+  const first = /^[A-Z]\.?$/i.test(given) ? "" : given;
   // "Berg Compliance Solutions (BES)" → "Berg Compliance Solutions"; "Atlas Safety & Health LLC" → "Atlas Safety & Health"
   const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim().replace(/,?\s+(LLC|Inc\.?|Corp\.?)$/i, "");
   // Quiet regions get the statewide number, so the pitch doesn't undersell.
