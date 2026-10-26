@@ -66,8 +66,9 @@ for (const sent of firsts) {
   if (cases.length < 2) cases.push(...picked.filter((l) => !cases.includes(l)).slice(0, 2 - cases.length));
   const where = local ? areaName(region, state) : stateName(state);
   const count = local ? inRegion : fresh.length;
-  const name = row.firm.replace(/\s*\(.*?\)\s*/g, " ").replace(/,?\s+(LLC|Inc\.?|L\.L\.C\.)$/i, "").trim();
-  const first = row.contact_name ? row.contact_name.split(/[ (]/)[0] : "";
+  const name = row.firm.replace(/\s*\(.*?\)\s*/g, " ").trim().replace(/,?\s+(LLC|Inc\.?|L\.L\.C\.)$/i, "").trim();
+  const given = row.contact_name ? row.contact_name.split(/[ (]/)[0] : "";
+  const first = /^[A-Z]\.?$/i.test(given) ? "" : given;
   const body = [
     first ? `Hi ${first},` : `Hi ${name} team,`,
     "",
