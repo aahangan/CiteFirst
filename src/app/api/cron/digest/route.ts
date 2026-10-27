@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { runKey, type RunReport } from "@/engine/run";
+import { ingestMeta } from "@/lib/cases";
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/leads";
 import { runFor, todayNY } from "@/lib/runtime";
@@ -17,6 +18,7 @@ function authorized(req: Request) {
 //   ?date=YYYY-MM-DD   run for a specific day (default: today in New York)
 //   ?dryRun=1          report what would be sent without sending or recording anything
 //   ?force=1           run even if that day already completed (still never re-sends a lead)
+//   ?wait=1            skip if today's ingest hasn't landed yet; a later cron retries (vercel.json)
 export async function GET(req: Request) {
   if (!authorized(req)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const params = new URL(req.url).searchParams;
@@ -27,6 +29,10 @@ export async function GET(req: Request) {
   if (!dryRun && params.get("force") !== "1") {
     const previous = await db.get<RunReport>(runKey(date));
     if (previous?.status === "completed") return Response.json({ skipped: "already completed", report: previous });
+  }
+  // GitHub's scheduled ingest can start hours late; early crons hold off rather than send stale cases.
+  if (params.get("wait") === "1" && date === todayNY() && (await ingestMeta())?.date !== date) {
+    return Response.json({ skipped: "waiting for today's ingest" });
   }
   const report = await runFor(date, siteUrl(req), { dryRun });
   return Response.json({ report }, { status: report.status === "failed" ? 500 : 200 });

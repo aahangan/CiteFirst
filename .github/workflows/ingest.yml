@@ -1,6 +1,7 @@
 name: OSHA ingest
 
-# Refreshes the OSHA case snapshot in Redis each morning, before the 11:00 UTC delivery cron.
+# Refreshes the OSHA case snapshot in Redis each morning, before the 11:00 UTC delivery cron. If it runs late,
+# delivery waits for it (hourly retries until 15:00 UTC, then sends with the previous snapshot).
 on:
   schedule:
     - cron: "15 9 * * *"

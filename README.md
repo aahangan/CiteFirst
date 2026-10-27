@@ -46,7 +46,8 @@ src/lib/runtime.ts        wires the run to the ingest, Redis and email
 ```
 
 ### The daily run
-`/api/cron/digest` is called by Vercel Cron at 11:00 UTC (about 7am New York).
+`/api/cron/digest` is called by Vercel Cron at 11:00 UTC (about 7am New York). If that morning's ingest
+hasn't landed, it retries hourly (`?wait=1`) and sends regardless at 15:00 UTC.
 - **Ingest:** re-reads the last 75 days from the DOL API (inspections of lead-worthy types opened, violations issued,
   plus the older inspections those violations belong to, unless yesterday's snapshot already has them) and
   rewrites the per-state snapshot, stamping anything new with today's date. An empty fetch keeps yesterday's
