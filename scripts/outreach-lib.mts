@@ -127,7 +127,7 @@ export function pitch(firm: Record<string, string>, leads: Lead[], mailingAddres
   const given = firm.contact_name ? firm.contact_name.split(/[ (]/)[0] : "";
   const first = /^[A-Z]\.?$/i.test(given) ? "" : given;
   // "Berg Compliance Solutions (BES)" → "Berg Compliance Solutions"; "Atlas Safety & Health LLC" → "Atlas Safety & Health"
-  const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim().replace(/,?\s+(LLC|Inc\.?|Corp\.?)$/i, "");
+  const name = firm.firm.replace(/\s*\(.*?\)\s*/g, " ").trim().replace(/,?\s+(P?LLC|Inc\.?|Corp\.?)$/i, "");
   // Quiet regions get the statewide number, so the pitch doesn't undersell.
   const local = inRegion >= 10;
   const count = local ? inRegion : leads.length;
@@ -136,7 +136,7 @@ export function pitch(firm: Record<string, string>, leads: Lead[], mailingAddres
   const cases = picked.map((l) => `- ${describe(l)}`);
   const offer = `Would a free 30-day trial be useful for ${name}? Reply "yes" and I'll set it up for your area. No card needed. You can see this week's cases at https://${SENDER.site}/demo.`;
   const body = [
-    first ? `Hi ${first},` : `Hi ${name} team,`,
+    first ? `Hi ${first},` : `Hi ${name.replace(/^The /, "")} team,`,
     "",
     "I'm Aahan, a UCLA student building CiteFirst on my own: a lead service for safety consultants and trainers.",
     "",

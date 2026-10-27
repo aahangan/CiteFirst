@@ -25,6 +25,7 @@ const FILE_STATES: Record<string, string> = {
   washington: "WA", oregon: "OR", kansas: "KS", iowa: "IA", utah: "UT",
   nevada: "NV", nebraska: "NE", mississippi: "MS", westvirginia: "WV", newmexico: "NM", california2: "CA", texas2: "TX",
   florida2: "FL", newyork2: "NY", pennsylvania2: "PA", illinois2: "IL", ohio2: "OH",
+  washington2: "WA", michigan2: "MI", minnesota2: "MN", northcarolina2: "NC", massachusetts2: "MA",
 };
 
 const args = process.argv.slice(2);
@@ -66,11 +67,11 @@ for (const sent of firsts) {
   if (cases.length < 2) cases.push(...picked.filter((l) => !cases.includes(l)).slice(0, 2 - cases.length));
   const where = local ? areaName(region, state) : stateName(state);
   const count = local ? inRegion : fresh.length;
-  const name = row.firm.replace(/\s*\(.*?\)\s*/g, " ").trim().replace(/,?\s+(LLC|Inc\.?|L\.L\.C\.)$/i, "").trim();
+  const name = row.firm.replace(/\s*\(.*?\)\s*/g, " ").trim().replace(/,?\s+(P?LLC|Inc\.?|L\.L\.C\.)$/i, "").trim();
   const given = row.contact_name ? row.contact_name.split(/[ (]/)[0] : "";
   const first = /^[A-Z]\.?$/i.test(given) ? "" : given;
   const body = [
-    first ? `Hi ${first},` : `Hi ${name} team,`,
+    first ? `Hi ${first},` : `Hi ${name.replace(/^The /, "")} team,`,
     "",
     `Following up on my note from last ${new Date(`${sent.sent_on}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" })}. Since then OSHA has published ${count} more ${count === 1 ? "case" : "cases"} in ${where}, for example:`,
     "",
