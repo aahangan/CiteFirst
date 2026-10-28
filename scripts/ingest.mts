@@ -1,6 +1,6 @@
-// Refreshes the OSHA case snapshot from the DOL API. Runs daily on GitHub Actions before the 7am
-// delivery (.github/workflows/ingest.yml), outside the web app: the DOL API throttles hard, so
-// requests are paced and a run can take several minutes, longer than a serverless function may.
+// Refreshes the OSHA case snapshot from the DOL API. Vercel Cron runs the same ingest daily
+// (src/app/api/cron/ingest); this script is the GitHub Actions backup (.github/workflows/ingest.yml)
+// and the way to refresh a local snapshot. The DOL API throttles hard, so a run can take minutes.
 //
 //   npm run ingest                    (reads .env.local; writes Redis, or .data/db.json without it)
 import { ingest } from "../src/lib/cases";

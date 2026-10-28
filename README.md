@@ -51,7 +51,8 @@ hasn't landed, it retries hourly (`?wait=1`) and sends regardless at 15:00 UTC.
 - **Ingest:** re-reads the last 75 days from the DOL API (inspections of lead-worthy types opened, violations issued,
   plus the older inspections those violations belong to, unless yesterday's snapshot already has them) and
   rewrites the per-state snapshot, stamping anything new with today's date. An empty fetch keeps yesterday's
-  snapshot. Runs as `npm run ingest` from GitHub Actions (`.github/workflows/ingest.yml`), not in the web app.
+  snapshot. Runs on Vercel Cron at 09:15 UTC (`/api/cron/ingest`, needs `DOL_API_KEY` in Vercel), with
+  `npm run ingest` on GitHub Actions (`.github/workflows/ingest.yml`) as a backup.
 - **Delivery:** the Vercel cron reads the snapshot; it alerts if the morning's ingest didn't run.
 
 ### DOL API quirks (measured)

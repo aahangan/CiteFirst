@@ -8,6 +8,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 const day = (v?: string) => (v ? v.slice(0, 10) : undefined);
 const titleCase = (s: string) => s.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase()).replace(/\b(Llc|Lp|Llp|Pllc|Pc|Usa)\b/g, (w) => w.toUpperCase());
+/** State plans prefix some names with an internal case number: "Wa317991855 - Price Cold Storage". */
+export const stripCaseNumber = (name: string) => name.replace(/^[A-Z]{2,3}\d[A-Z0-9]{5,} - (?=\S)/i, "");
 const money = (v?: string) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -31,7 +33,7 @@ export function inspectionInfo(r: Row): InspectionInfo | null {
   const employees = Number(r.nr_in_estab);
   return {
     activityNr: r.activity_nr,
-    name: titleCase((r.estab_name ?? "Unnamed establishment").replace(/\s+/g, " ")),
+    name: stripCaseNumber(titleCase((r.estab_name ?? "Unnamed establishment").replace(/\s+/g, " "))),
     address: titleCase(r.site_address ?? ""),
     city: titleCase(r.site_city ?? ""),
     state: r.site_state.toUpperCase(),
@@ -83,7 +85,7 @@ export function buildCases(opened: Row[], violations: Row[], known: InspectionIn
     else byNr.set(v.activity_nr, [v]);
   }
   const infos = new Map<string, InspectionInfo>();
-  for (const k of known) if (byNr.has(k.activityNr)) infos.set(k.activityNr, k);
+  for (const k of known) if (byNr.has(k.activityNr)) infos.set(k.activityNr, { ...k, name: stripCaseNumber(k.name) });
   for (const r of opened) {
     const info = inspectionInfo(r);
     if (info && !infos.has(info.activityNr)) infos.set(info.activityNr, info);

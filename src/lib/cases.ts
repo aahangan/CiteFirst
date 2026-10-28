@@ -39,7 +39,7 @@ export async function storedCases(areas: string[]): Promise<OshaCase[]> {
  */
 export async function ingest(date: string, asOf: Date, opts: { write: boolean }): Promise<CaseFetch> {
   const previous = await snapshot(STATE_CODES);
-  // Runs offline (GitHub Actions), so it can afford to wait out the API's throttling.
+  // Runs from Vercel Cron (api/cron/ingest, 300s limit) and GitHub Actions as a backup.
   const result = await fetchCases(asOf, WINDOW_DAYS, { inspectionTypes: WANTED_TYPES, known: previous ?? [], retries: 5 });
   const cases = stampFirstSeen(result.cases, previous, date);
   if (opts.write) {

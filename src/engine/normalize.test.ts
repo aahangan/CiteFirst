@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { defense } from "../verticals/defense";
 import { safety } from "../verticals/safety";
 import { inspections, violations } from "./__fixtures__/osha";
-import { buildCases, inspectionInfo, stampFirstSeen } from "./cases";
+import { buildCases, inspectionInfo, stampFirstSeen, stripCaseNumber } from "./cases";
 import { caseToLead, casesToLeads, dedupeKey, scoreLead } from "./normalize";
 import { formatStandard, standardName } from "./osha";
 
@@ -119,5 +119,14 @@ describe("casesToLeads", () => {
     const inspection = caseToLead(byNr("1800001"), safety, NOW)!;
     expect(dedupeKey(inspection, safety)).toBe("osha:1800001:inspection");
     expect(dedupeKey({ ...inspection, kind: "citation" }, safety)).toBe("osha:1800001:citation");
+  });
+});
+
+describe("stripCaseNumber", () => {
+  it("drops a state plan's case-number prefix and keeps ordinary names", () => {
+    expect(stripCaseNumber("Wa317991855 - Price Cold Storage & Packing Company LLC")).toBe("Price Cold Storage & Packing Company LLC");
+    expect(stripCaseNumber("Ppx2026xjl680x0071 - M & R Sheet Metal & Mfg., Inc.")).toBe("M & R Sheet Metal & Mfg., Inc.");
+    expect(stripCaseNumber("3M Company - Cottage Grove")).toBe("3M Company - Cottage Grove");
+    expect(stripCaseNumber("Acme Roofing")).toBe("Acme Roofing");
   });
 });

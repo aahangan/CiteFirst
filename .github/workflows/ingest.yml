@@ -1,7 +1,7 @@
 name: OSHA ingest
 
-# Refreshes the OSHA case snapshot in Redis each morning, before the 11:00 UTC delivery cron. If it runs late,
-# delivery waits for it (hourly retries until 15:00 UTC, then sends with the previous snapshot).
+# Backup for the Vercel Cron ingest (/api/cron/ingest, 09:15 UTC). GitHub has started this schedule hours
+# late, so delivery no longer depends on it; a late run is harmless (first-seen dates carry over).
 on:
   schedule:
     - cron: "15 9 * * *"

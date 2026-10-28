@@ -1,5 +1,6 @@
 {
   "crons": [
+    { "path": "/api/cron/ingest", "schedule": "15 9 * * *" },
     { "path": "/api/cron/digest?wait=1", "schedule": "0 11 * * *" },
     { "path": "/api/cron/digest?wait=1", "schedule": "0 12 * * *" },
     { "path": "/api/cron/digest?wait=1", "schedule": "0 13 * * *" },
