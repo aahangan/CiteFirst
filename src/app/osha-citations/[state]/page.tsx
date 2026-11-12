@@ -11,11 +11,8 @@ import { STATES, usd } from "@/lib/geo";
 import { REPORT_DAYS, stateFromSlug, stateReport, stateSlug } from "@/lib/report";
 import { safety } from "@/verticals/safety";
 
-export const revalidate = 21600;
-// Rendered on first visit, then refreshed every few hours (ISR).
-export function generateStaticParams() {
-  return [];
-}
+// The report data is cached in lib/report; the Redis client's no-store fetches rule out static rendering.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps<"/osha-citations/[state]">): Promise<Metadata> {
   const code = stateFromSlug((await params).state);
@@ -35,8 +32,7 @@ export default async function StatePage({ params }: PageProps<"/osha-citations/[
   const [r, meta] = await Promise.all([stateReport(code), ingestMeta()]);
   const name = STATES[code];
   const labels = labelsFor(safety);
-  const biggest = [...r.leads].filter((l) => l.kind === "citation").sort((a, b) => b.penalty - a.penalty).slice(0, 10);
-  const open = r.leads.filter((l) => l.kind === "inspection").slice(0, 5);
+  const { biggest, openCases: open } = r;
   const signup = `/signup?areas=${code}`;
 
   return (

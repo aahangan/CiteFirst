@@ -6,7 +6,7 @@ import { BRAND } from "@/lib/brand";
 import { STATES } from "@/lib/geo";
 import { REPORT_DAYS, stateCounts, stateSlug } from "@/lib/report";
 
-export const revalidate = 21600;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: `OSHA citations by state, last ${REPORT_DAYS} days · ${BRAND.name}`,

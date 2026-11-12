@@ -1,4 +1,5 @@
 // Public per-state summaries of recent OSHA enforcement, for the indexable /osha-citations pages.
+import { unstable_cache } from "next/cache";
 import { standardName } from "@/engine/osha";
 import { getLeads } from "./cases";
 import { type Lead, STATES } from "./geo";
@@ -21,7 +22,10 @@ const tally = (names: (string | undefined)[], top: number): Tally[] => {
 
 export type StateReport = {
   state: string;
-  leads: Lead[];
+  /** Largest penalties first. */
+  biggest: Lead[];
+  /** Open inspections, hottest first. */
+  openCases: Lead[];
   cited: number;
   open: number;
   penalties: number;
@@ -36,7 +40,8 @@ export function summarize(state: string, leads: Lead[]): StateReport {
   const cited = leads.filter((l) => l.kind === "citation");
   return {
     state,
-    leads,
+    biggest: [...cited].sort((a, b) => b.penalty - a.penalty).slice(0, 10),
+    openCases: leads.filter((l) => l.kind === "inspection").slice(0, 5),
     cited: cited.length,
     open: leads.length - cited.length,
     penalties: cited.reduce((s, l) => s + l.penalty, 0),
@@ -47,18 +52,25 @@ export function summarize(state: string, leads: Lead[]): StateReport {
   };
 }
 
-export async function stateReport(state: string): Promise<StateReport> {
-  return summarize(state, await getLeads(safety, { areas: [state], days: REPORT_DAYS }));
-}
+// Cached for a few hours, so crawlers don't each pull a state's cases from Redis.
+export const stateReport = unstable_cache(
+  async (state: string): Promise<StateReport> => summarize(state, await getLeads(safety, { areas: [state], days: REPORT_DAYS })),
+  ["state-report"],
+  { revalidate: 21600 },
+);
 
 /** Case counts for every state, for the index page and sitemap. */
-export async function stateCounts(): Promise<Record<string, { cited: number; total: number }>> {
-  const leads = await getLeads(safety, { areas: [], days: REPORT_DAYS });
-  const out: Record<string, { cited: number; total: number }> = {};
-  for (const l of leads) {
-    const c = (out[l.state] ??= { cited: 0, total: 0 });
-    c.total++;
-    if (l.kind === "citation") c.cited++;
-  }
-  return out;
-}
+export const stateCounts = unstable_cache(
+  async (): Promise<Record<string, { cited: number; total: number }>> => {
+    const leads = await getLeads(safety, { areas: [], days: REPORT_DAYS });
+    const out: Record<string, { cited: number; total: number }> = {};
+    for (const l of leads) {
+      const c = (out[l.state] ??= { cited: 0, total: 0 });
+      c.total++;
+      if (l.kind === "citation") c.cited++;
+    }
+    return out;
+  },
+  ["state-counts"],
+  { revalidate: 21600 },
+);
