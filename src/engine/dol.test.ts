@@ -38,6 +38,13 @@ describe("DOL client", () => {
     expect(calls).toBe(1);
   });
 
+  it("retries a 200 response that was cut off mid-body", async () => {
+    let calls = 0;
+    const cut = async () => (++calls === 1 ? new Response('{"data": [{"a": 1', { status: 200 }) : json([{ a: 1 }]));
+    expect(await dolPage("OSHA", "x", {}, { limit: 1, offset: 0 }, { ...fast, apiKey: "k", fetch: cut, sleep: noSleep })).toEqual([{ a: "1" }]);
+    expect(calls).toBe(2);
+  });
+
   it("retries network errors and gives up after the retry limit", async () => {
     let calls = 0;
     const down = async () => { calls++; throw new TypeError("fetch failed"); };

@@ -112,19 +112,27 @@ export async function dolPage(agency: string, endpoint: string, q: DolQuery, pag
       }
     });
     if (res?.ok) {
-      const body = JSON.parse(res.text) as unknown;
-      const data = Array.isArray(body) ? body : (body as { data?: unknown } | null)?.data;
-      if (!Array.isArray(data)) throw new DolError(`Unexpected response shape from ${endpoint}`);
-      return data.map((r) => toRow(r as Record<string, unknown>));
-    }
-    if (res) {
+      // The API sometimes cuts a 200 response off mid-body; treat that like a server error and retry.
+      let body: unknown;
+      try {
+        body = JSON.parse(res.text);
+      } catch {
+        error = new DolError(`DOL ${endpoint}: truncated response (${res.text.length} bytes)`);
+      }
+      if (!error) {
+        const data = Array.isArray(body) ? body : (body as { data?: unknown } | null)?.data;
+        if (!Array.isArray(data)) throw new DolError(`Unexpected response shape from ${endpoint}`);
+        return data.map((r) => toRow(r as Record<string, unknown>));
+      }
+    } else if (res) {
       const text = res.text.slice(0, 200);
       error = new DolError(`DOL ${endpoint} ${res.status}: ${text}`, res.status);
       // Bad requests and auth failures won't fix themselves; only retry rate limits and server errors.
       if (res.status !== 429 && res.status < 500) throw error;
     }
     if (attempt >= retries) throw error!;
-    const delayMs = (error!.status && error!.status < 500 ? 30_000 : 2_000) * 2 ** attempt;
+    // 502s from the API tend to last tens of seconds, so server errors back off 10s, 20s, 40s.
+    const delayMs = (error!.status && error!.status < 500 ? 30_000 : 10_000) * 2 ** attempt;
     log.warn("dol.retry", { endpoint, attempt: attempt + 1, delayMs, error: error!.message });
     await sleep(delayMs);
   }
