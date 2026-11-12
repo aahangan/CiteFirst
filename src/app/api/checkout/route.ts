@@ -3,6 +3,8 @@ import { createAccount, findAccountByEmail, signIn } from "@/lib/accounts";
 import { normalizeAreas } from "@/lib/geo";
 import { allow, clientIp } from "@/lib/db";
 import { siteUrl } from "@/lib/leads";
+import { alert } from "@/lib/alerts";
+import { invite } from "@/lib/invite";
 import { getStripe, PRICE, TRIAL_DAYS } from "@/lib/stripe";
 import { DEFAULT_VERTICAL, VERTICAL_IDS, type VerticalId } from "@/verticals";
 
@@ -27,7 +29,13 @@ export async function POST(req: Request) {
   const price = PRICE.base();
   if (!stripe || !price) {
     // Local development without Stripe: create the account directly so the app can be used.
-    if (process.env.NODE_ENV === "production") return Response.json({ error: "Payments aren't configured yet." }, { status: 503 });
+    if (process.env.NODE_ENV === "production") {
+      // Until billing is set up, signups get a no-card trial; the emailed link confirms the address.
+      if (await findAccountByEmail(email)) return Response.json({ error: "That email already has an account. Log in instead." }, { status: 409 });
+      await invite({ email, company, areas, vertical, days: TRIAL_DAYS }, siteUrl(req), { send: true, replyTo: process.env.ADMIN_REPLY_TO });
+      await alert(`signup:${email.toLowerCase()}`, "New self-serve trial", { company, email, areas, vertical });
+      return Response.json({ sent: true });
+    }
     const account = (await findAccountByEmail(email)) ?? (await createAccount({ email, company, areas, vertical, status: "dev" }));
     await signIn(account.id);
     return Response.json({ url: "/dashboard?welcome=1" });

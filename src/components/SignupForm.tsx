@@ -10,7 +10,7 @@ const AUDIENCES = [
   { id: "defense", label: "Law firm", hint: "OSHA defense / employment" },
 ] as const;
 
-export function SignupForm({ initialError, vertical: initialVertical, areas: initialAreas = "" }: { initialError: string | null; vertical: string; areas?: string }) {
+export function SignupForm({ initialError, vertical: initialVertical, areas: initialAreas = "", billing = true }: { initialError: string | null; vertical: string; areas?: string; billing?: boolean }) {
   const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [vertical, setVertical] = useState(initialVertical);
@@ -18,6 +18,7 @@ export function SignupForm({ initialError, vertical: initialVertical, areas: ini
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
+  const [sent, setSent] = useState(false);
 
   // Show how many cases their states produced last month, so they see the value before paying.
   useEffect(() => {
@@ -42,7 +43,17 @@ export function SignupForm({ initialError, vertical: initialVertical, areas: ini
     });
     const data = await res.json().catch(() => ({}));
     if (data.url) window.location.href = data.url;
+    else if (data.sent) setSent(true);
     else { setError(data.error ?? "Something went wrong"); setBusy(false); }
+  }
+
+  if (sent) {
+    return (
+      <div className="rounded-xl border border-line bg-card p-6 text-center">
+        <p className="text-lg font-semibold">Check your inbox</p>
+        <p className="mt-2 text-muted">We sent a link to {email}. Tap it to open your dashboard. Your first lead email arrives tomorrow at 7am ET.</p>
+      </div>
+    );
   }
 
   return (
@@ -89,7 +100,9 @@ export function SignupForm({ initialError, vertical: initialVertical, areas: ini
 
       <button disabled={busy} className="btn btn-signal w-full py-3.5 text-lg">{busy ? "Starting…" : `Start ${TRIAL_DAYS}-day free trial`}</button>
       {error && <p className="text-center text-sm text-signal">{error}</p>}
-      <p className="text-center text-xs text-muted">{PLAN.base}/month after the trial. Cancel anytime before it ends and you won&apos;t be charged.</p>
+      <p className="text-center text-xs text-muted">
+        {billing ? <>{PLAN.base}/month after the trial. Cancel anytime before it ends and you won&apos;t be charged.</> : <>No card needed. {PLAN.base}/month if you keep it after the trial.</>}
+      </p>
     </form>
   );
 }

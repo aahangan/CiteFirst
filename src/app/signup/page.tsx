@@ -15,7 +15,7 @@ export default async function Signup({ searchParams }: PageProps<"/signup">) {
       <Logo />
       <h1 className="mt-10 font-[family-name:var(--font-display)] text-3xl font-extrabold">Start your free trial</h1>
       <p className="mt-2 mb-8 text-muted">Tomorrow at 7am ET you&apos;ll get your first list of new {vertical.noun.plural} in your states.</p>
-      <SignupForm vertical={vertical.id} areas={typeof areas === "string" ? normalizeAreas(areas).areas.join(", ") : ""} initialError={error === "checkout" ? "Checkout didn't complete. Try again." : null} />
+      <SignupForm vertical={vertical.id} billing={!!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_BASE)} areas={typeof areas === "string" ? normalizeAreas(areas).areas.join(", ") : ""} initialError={error === "checkout" ? "Checkout didn't complete. Try again." : null} />
     </main>
   );
 }
