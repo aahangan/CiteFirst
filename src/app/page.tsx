@@ -5,7 +5,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { labelsFor } from "@/engine/schema";
 import { BRAND, PLAN, TRIAL_DAYS } from "@/lib/brand";
 import { getLeads } from "@/lib/cases";
-import { usd } from "@/lib/geo";
+import { STATES, usd } from "@/lib/geo";
+import { stateSlug } from "@/lib/report";
 import { safety } from "@/verticals/safety";
 
 export const revalidate = 3600;
@@ -144,6 +145,17 @@ export default async function Home() {
               <p className="mb-5 text-sm">Lock a state and no other firm buying the same leads sees its cases. One firm per state, first come, first served.</p>
               <p className="text-sm text-muted">Available once your trial converts. Manage locks from your settings.</p>
             </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-4xl px-5 pb-20 text-center">
+          <h2 className="mb-2 font-[family-name:var(--font-display)] text-3xl font-extrabold">Recent OSHA citations by state</h2>
+          <p className="mb-6 text-muted">Penalties, most cited standards and the largest cases in each state, last 30 days.</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {["TX", "CA", "FL", "NY", "PA", "IL", "OH", "GA", "NC", "MI", "NJ", "WA"].map((code) => (
+              <Link key={code} href={`/osha-citations/${stateSlug(code)}`} className="rounded-full border border-line bg-card px-4 py-1.5 text-sm hover:border-foreground/30">{STATES[code]}</Link>
+            ))}
+            <Link href="/osha-citations" className="rounded-full px-4 py-1.5 text-sm underline">All states</Link>
           </div>
         </section>
 

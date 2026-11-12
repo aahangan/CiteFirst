@@ -10,11 +10,11 @@ const AUDIENCES = [
   { id: "defense", label: "Law firm", hint: "OSHA defense / employment" },
 ] as const;
 
-export function SignupForm({ initialError, vertical: initialVertical }: { initialError: string | null; vertical: string }) {
+export function SignupForm({ initialError, vertical: initialVertical, areas: initialAreas = "" }: { initialError: string | null; vertical: string; areas?: string }) {
   const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [vertical, setVertical] = useState(initialVertical);
-  const [areas, setAreas] = useState("");
+  const [areas, setAreas] = useState(initialAreas);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
