@@ -28,7 +28,7 @@ const posts = reports.map((r) => {
     `${name} OSHA enforcement, last ${days} days: ${r.cited} employers cited, ${usd(r.penalties)} in penalties.`,
     "",
     r.standards.length ? `Most cited: ${r.standards.slice(0, 3).map((s) => `${lowerTopic(s.name)} (${s.count})`).join(", ")}.` : "",
-    top ? `Largest: ${an((top.industry ?? "local").toLowerCase())} employer in ${top.city}${top.employees ? ` with ${top.employees.toLocaleString()} employees` : ""}, ${usd(top.penalty)}${leadTopics(top)[0] ? ` (${lowerTopic(leadTopics(top)[0])})` : ""}.` : "",
+    top ? `Largest: ${top.industry && top.industry !== "Other services" ? an(top.industry.toLowerCase()) : "an"} employer in ${top.city}${top.employees ? ` with ${top.employees.toLocaleString()} employees` : ""}, ${usd(top.penalty)}${leadTopics(top)[0] ? ` (${lowerTopic(leadTopics(top)[0])})` : ""}.` : "",
     where ? `Busiest areas: ${where}.` : "",
     r.open ? `Plus ${r.open} open accident, complaint and referral inspections that haven't reached citations yet.` : "",
     "",
