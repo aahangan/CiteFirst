@@ -12,6 +12,18 @@ export const stateSlug = (code: string) => STATES[code].toLowerCase().replace(/[
 const BY_SLUG = new Map(Object.keys(STATES).map((code) => [stateSlug(code), code]));
 export const stateFromSlug = (slug: string) => BY_SLUG.get(slug);
 
+/** "Lockout/tagout" → "lockout-tagout". */
+export const topicSlug = (name: string) => name.toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** Distinct named standards cited in a case. */
+export const leadTopics = (l: Lead) => [...new Set(l.notes.map((n) => standardName(n.split(" · ")[0])).filter((t): t is string => !!t))];
+
+/** "Injury and illness prevention program (IIPP)" → "injury and illness prevention program (IIPP)" for use mid-sentence. */
+export const lowerTopic = (name: string) => name.replace(/^[^(]+/, (m) => m.toLowerCase());
+
+/** Topic pages need this many cited employers to be worth indexing. */
+export const MIN_TOPIC_CASES = 3;
+
 export type Tally = { name: string; count: number };
 
 const tally = (names: (string | undefined)[], top: number): Tally[] => {
@@ -45,7 +57,7 @@ export function summarize(state: string, leads: Lead[]): StateReport {
     cited: cited.length,
     open: leads.length - cited.length,
     penalties: cited.reduce((s, l) => s + l.penalty, 0),
-    standards: tally(cited.flatMap((l) => [...new Set(l.notes.map((n) => standardName(n.split(" · ")[0])))]), 8),
+    standards: tally(cited.flatMap(leadTopics), 8),
     cities: tally(leads.map((l) => l.city), 8),
     industries: tally(leads.map((l) => l.industry), 6),
     fatalities: leads.filter((l) => l.categories.includes("fatality")).length,
@@ -72,5 +84,40 @@ export const stateCounts = unstable_cache(
     return out;
   },
   ["state-counts"],
+  { revalidate: 21600 },
+);
+
+export type TopicReport = StateReport & { topic: string };
+
+/** A state's cited employers for one standard ("fall-protection"), or null if none. */
+export const topicReport = unstable_cache(
+  async (state: string, slug: string): Promise<TopicReport | null> => {
+    const leads = await getLeads(safety, { areas: [state], days: REPORT_DAYS });
+    const matching = leads.filter((l) => l.kind === "citation" && leadTopics(l).some((t) => topicSlug(t) === slug));
+    if (!matching.length) return null;
+    const topic = leadTopics(matching[0]).find((t) => topicSlug(t) === slug)!;
+    return { ...summarize(state, matching), topic };
+  },
+  ["topic-report"],
+  { revalidate: 21600 },
+);
+
+/** Topic slugs with at least MIN_TOPIC_CASES cited employers, per state, for the sitemap. */
+export const stateTopics = unstable_cache(
+  async (): Promise<Record<string, string[]>> => {
+    const counts = new Map<string, number>();
+    for (const l of await getLeads(safety, { areas: [], days: REPORT_DAYS })) {
+      if (l.kind !== "citation") continue;
+      for (const t of leadTopics(l)) counts.set(`${l.state}|${topicSlug(t)}`, (counts.get(`${l.state}|${topicSlug(t)}`) ?? 0) + 1);
+    }
+    const out: Record<string, string[]> = {};
+    for (const [key, n] of counts) {
+      if (n < MIN_TOPIC_CASES) continue;
+      const [state, slug] = key.split("|");
+      (out[state] ??= []).push(slug);
+    }
+    return out;
+  },
+  ["state-topics"],
   { revalidate: 21600 },
 );

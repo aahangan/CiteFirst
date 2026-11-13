@@ -4,11 +4,13 @@ import { notFound } from "next/navigation";
 import { LeadSummary } from "@/components/LeadCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { WeeklySignup } from "@/components/WeeklySignup";
+import { TallyList, TopicLinks } from "@/components/ReportParts";
 import { labelsFor } from "@/engine/schema";
 import { BRAND, PLAN, TRIAL_DAYS } from "@/lib/brand";
 import { ingestMeta } from "@/lib/cases";
 import { STATES, usd } from "@/lib/geo";
-import { REPORT_DAYS, stateFromSlug, stateReport, stateSlug } from "@/lib/report";
+import { lowerTopic, REPORT_DAYS, stateFromSlug, stateReport, stateSlug } from "@/lib/report";
 import { safety } from "@/verticals/safety";
 
 // The report data is cached in lib/report; the Redis client's no-store fetches rule out static rendering.
@@ -21,12 +23,13 @@ export async function generateMetadata({ params }: PageProps<"/osha-citations/[s
   const name = STATES[code];
   const title = `OSHA citations in ${name}: ${r?.cited ?? "Recent"} employers cited in the last ${REPORT_DAYS} days`;
   const description = r
-    ? `${r.cited} ${name} employers cited and ${r.open} open OSHA inspections published in the last ${REPORT_DAYS} days, with ${usd(r.penalties)} in penalties.${r.standards[0] ? ` Most cited: ${r.standards.slice(0, 3).map((s) => s.name.toLowerCase()).join(", ")}.` : ""} Updated daily.`
+    ? `${r.cited} ${name} employers cited and ${r.open} open OSHA inspections published in the last ${REPORT_DAYS} days, with ${usd(r.penalties)} in penalties.${r.standards[0] ? ` Most cited: ${r.standards.slice(0, 3).map((s) => lowerTopic(s.name)).join(", ")}.` : ""} Updated daily.`
     : `Recent OSHA inspections and citations in ${name}, updated daily.`;
   return { title, description, alternates: { canonical: `/osha-citations/${stateSlug(code)}` }, openGraph: { title, description } };
 }
 
-export default async function StatePage({ params }: PageProps<"/osha-citations/[state]">) {
+export default async function StatePage({ params, searchParams }: PageProps<"/osha-citations/[state]">) {
+  const { weekly } = await searchParams;
   const code = stateFromSlug((await params).state);
   if (!code) notFound();
   const [r, meta] = await Promise.all([stateReport(code), ingestMeta()]);
@@ -55,10 +58,12 @@ export default async function StatePage({ params }: PageProps<"/osha-citations/[
         </div>
 
         <div className="grid gap-6 sm:grid-cols-3">
-          <TallyList title="Most cited standards" items={r.standards} unit="employers" />
+          <TopicLinks state={code} items={r.standards} />
           <TallyList title="Cities" items={r.cities} unit="cases" />
           <TallyList title="Industries" items={r.industries} unit="cases" />
         </div>
+
+        <div className="mt-8"><WeeklySignup state={code} stateName={name} notice={typeof weekly === "string" ? weekly : undefined} /></div>
 
         {biggest.length > 0 && (
           <section className="mt-12">
@@ -89,19 +94,5 @@ export default async function StatePage({ params }: PageProps<"/osha-citations/[
       </main>
       <SiteFooter />
     </>
-  );
-}
-
-function TallyList({ title, items, unit }: { title: string; items: { name: string; count: number }[]; unit: string }) {
-  if (!items.length) return null;
-  return (
-    <div className="rounded-2xl border border-line bg-card p-5">
-      <h2 className="mb-3 text-sm font-semibold">{title}</h2>
-      <ol className="space-y-1.5 text-sm">
-        {items.map((i) => (
-          <li key={i.name} className="flex justify-between gap-3"><span>{i.name}</span><span className="text-muted" title={unit}>{i.count}</span></li>
-        ))}
-      </ol>
-    </div>
   );
 }
